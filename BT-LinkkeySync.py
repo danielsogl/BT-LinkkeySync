@@ -12,7 +12,7 @@ print("---------------------------------")
 # file where the registry info shall be stored
 filename = 'btkeys.reg'
 
-highSierraLoc = False # change to true if running high sierra
+highSierraLoc = True # change to true if running high sierra
 
 print("> get Bluetooth Link Keys from macOS and store it to blued.plist")
 if not highSierraLoc:
@@ -32,9 +32,13 @@ pl = readPlist("./blued.plist")
 # open the file where we write the registry information
 f = open(filename, 'w')
 
-# function which is used to do the byte swapping and insert commas
-def convertToWinRep(s):
-	return ",".join(map(str.__add__, s[-2::-2] ,s[-1::-2]))
+# function which is used to do the byte swapping and insert commas (if needed)
+def reverseEndian(s, j=','):
+	return j.join(map(str.__add__, s[-2::-2] ,s[-1::-2]))
+
+# function which is used to insert commas
+def insertCommas(s):
+	return ','.join(map(str.__add__, s[0::2], s[1::2]))
 
 print("> Convert the Link Keys and store them to btkeys.reg")
 # header for the registry file
@@ -48,7 +52,7 @@ for adapter in pl["LinkKeys"].keys():
 
 	# loop over all available devices of this adapter
 	for device in pl["LinkKeys"][adapter].keys():
-		f.write('\r\n"'+device.replace("-","")+'"=hex:'+ convertToWinRep(pl["LinkKeys"][adapter][device].data.encode("hex")))
+		f.write('\r\n"'+device.replace("-","")+'"=hex:'+ reverseEndian(pl["LinkKeys"][adapter][device].data.encode("hex")))
 
 
 
@@ -62,26 +66,26 @@ for adapter in pl["SMPDistributionKeys"].keys():
 		
 		# Lonk-Term Key (LTK)
 		# 128-bit key used to generate the session key for an encrypted connection.
-		dev += '\r\n"LTK"=hex:'+ convertToWinRep(pl["SMPDistributionKeys"][adapter][device]["LTK"].data.encode("hex"))
+		dev += '\r\n"LTK"=hex:'+ insertCommas(pl["SMPDistributionKeys"][adapter][device]["LTK"].data.encode("hex"))
 		
 		#dev += '\r"KeyLength"=dword:00000000' # Don't know why this is zero when i pair my BT LE Mouse with windows.
 		dev += '\r\n"KeyLength"=dword:'+ pl["SMPDistributionKeys"][adapter][device]["LTKLength"].data.encode("hex").rjust(8,'0')
 
 		# Random Number (RAND):
 		# 64-bit stored value used to identify the LTK. A new RAND is generated each time a unique LTK is distributed.
-		dev += '\r\n"ERand"=hex(b):'+ convertToWinRep(pl["SMPDistributionKeys"][adapter][device]["RAND"].data.encode("hex"))
+		dev += '\r\n"ERand"=hex(b):'+ insertCommas(pl["SMPDistributionKeys"][adapter][device]["RAND"].data.encode("hex"))
 
 		# Encrypted Diversifier (EDIV)
 		# 16-bit stored value used to identify the LTK. A new EDIV is generated each time a new LTK is distributed.
-		dev += '\r\n"EDIV"=dword:'+ pl["SMPDistributionKeys"][adapter][device]["EDIV"].data.encode("hex").rjust(8,'0')
+		dev += '\r\n"EDIV"=dword:'+ reverseEndian(pl["SMPDistributionKeys"][adapter][device]["EDIV"].data.encode("hex"), '').rjust(8, '0')
 
 		# Identity Resolving Key (IRK)
 		# 128-bit key used to generate and resolve random address.
-		dev += '\r\n"IRK"=hex:'+ convertToWinRep(pl["SMPDistributionKeys"][adapter][device]["IRK"].data.encode("hex"))
+		dev += '\r\n"IRK"=hex:'+ reverseEndian(pl["SMPDistributionKeys"][adapter][device]["IRK"].data.encode("hex"))
 
 		# Device Address
 		# 48-bit Address of the connected device
-		dev += '\r\n"Address"=hex(b):'+ convertToWinRep(pl["SMPDistributionKeys"][adapter][device]["Address"].data.encode("hex").rjust(16,'0'))
+		dev += '\r\n"Address"=hex(b):'+ reverseEndian(pl["SMPDistributionKeys"][adapter][device]["Address"].data.encode("hex").rjust(16,'0'))
 
 		# Don't know whats that, i'm using an Logitech MX Master, and this is written to the registry when i pair it to windows
 		dev += '\r\n"AddressType"=dword:00000001'
